@@ -109,37 +109,42 @@ def decide(tool_name, tool_input, orig, new, edited, decision=""):
     edited, notes = extract_ai_comments(new, edited)
     out = {"hookEventName": "PreToolUse", "permissionDecision": "allow"}
     messages = []
-    if decision == "ask":
-        out["permissionDecision"] = "ask"
-        out["permissionDecisionReason"] = (
-            "Rejected in Zed: choose No and tell Claude why"
-        )
-    elif decision == "reject" or (edited == orig and new != orig):
+    if decision == "reject" or (not decision and edited == orig and new != orig):
         out["permissionDecision"] = "deny"
         messages.append("The user rejected this change in the Zed diff view.")
-    elif edited != new:
-        user_diff = "".join(
-            difflib.unified_diff(
-                new.splitlines(True),
-                edited.splitlines(True),
-                "your proposal",
-                "applied",
+    else:
+        if decision == "ask":  # Yes/No in Claude Code's prompt, with an optional note
+            out["permissionDecision"] = "ask"
+            out["permissionDecisionReason"] = (
+                "Decide here: Yes or No, and add a note if you like"
             )
-        )
-        messages.append(
-            f"The user edited your change to {tool_input['file_path']} in Zed before it was "
-            f"applied. The file holds their version; build on it, not on your proposal. "
-            f"Their edits:\n{user_diff}"
-        )
-        # updatedInput replaces the whole tool input, so start from the original
-        out["updatedInput"] = {
-            **tool_input,
-            **(
-                {"content": edited}
-                if tool_name == "Write"
-                else {"old_string": orig, "new_string": edited, "replace_all": False}
-            ),
-        }
+        if edited != new:
+            user_diff = "".join(
+                difflib.unified_diff(
+                    new.splitlines(True),
+                    edited.splitlines(True),
+                    "your proposal",
+                    "applied",
+                )
+            )
+            messages.append(
+                f"The user edited your change to {tool_input['file_path']} in Zed. "
+                f"The file holds their version; build on it, not on your proposal. "
+                f"Their edits:\n{user_diff}"
+            )
+            # updatedInput replaces the whole tool input, so start from the original
+            out["updatedInput"] = {
+                **tool_input,
+                **(
+                    {"content": edited}
+                    if tool_name == "Write"
+                    else {
+                        "old_string": orig,
+                        "new_string": edited,
+                        "replace_all": False,
+                    }
+                ),
+            }
     if notes:
         messages.append(
             "The user left review comments in the diff; the hook removed them "

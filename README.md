@@ -15,7 +15,7 @@ claude plugin marketplace add 31c0c3/claude-plugins
 claude plugin install zed-diff@31c0c3
 ```
 
-Then append the entries from [`zed/keymap.json`](plugins/zed-diff/zed/keymap.json) and
+In an open session, run `/reload-plugins`. Then append the entries from [`zed/keymap.json`](plugins/zed-diff/zed/keymap.json) and
 [`zed/tasks.json`](plugins/zed-diff/zed/tasks.json) to the same files in `~/.config/zed/`.
 
 Needs macOS, Zed's `zed` CLI on `PATH`, and `python3`. Without them the hook steps aside
@@ -28,7 +28,7 @@ and Claude Code asks as usual.
 | `cmd-enter` / `cmd-w` | Accept, including your edits |
 | `cmd-alt-z` | Reject the block under the cursor (all blocks = reject) |
 | `cmd-escape` | Reject |
-| `cmd-shift-escape` | Reject and type the reason in Claude Code |
+| `cmd-shift-escape` | Decide in Claude Code's prompt: Yes or No, with an optional note |
 
 ### Comments for Claude
 

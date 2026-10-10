@@ -1,0 +1,29 @@
+[
+  {
+    // Claude Code diff review (zed-diff hook). Zed's --diff view has no context of its own;
+    // diffs_expanded is the closest match (also true while git hunks are expanded inline).
+    "context": "Editor && diffs_expanded",
+    "bindings": {
+      // accept: save any edits first - the diff view never reports unsaved edits,
+      // so a plain close would drop them
+      "cmd-enter": ["pane::CloseActiveItem", { "save_intent": "save_without_format" }],
+      "cmd-w": ["pane::CloseActiveItem", { "save_intent": "save_without_format" }],
+      // reject; saves first so the hook can read any AI comments you left as the reason
+      "cmd-escape": [
+        "action::Sequence",
+        [
+          ["task::Spawn", { "task_name": "claude: reject diff" }],
+          ["pane::CloseActiveItem", { "save_intent": "save_without_format" }]
+        ]
+      ],
+      // reject and tell Claude why in its prompt (cmd-alt-escape is macOS Force Quit)
+      "cmd-shift-escape": [
+        "action::Sequence",
+        [
+          ["task::Spawn", { "task_name": "claude: reject diff with reason" }],
+          ["pane::CloseActiveItem", { "save_intent": "save_without_format" }]
+        ]
+      ]
+    }
+  }
+]

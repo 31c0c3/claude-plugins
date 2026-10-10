@@ -1,0 +1,15 @@
+{
+  "name": "31c0c3",
+  "description": "Claude Code plugins by 31c0c3",
+  "owner": {
+    "name": "31c0c3",
+    "url": "https://github.com/31c0c3"
+  },
+  "plugins": [
+    {
+      "name": "zed-diff",
+      "source": "./plugins/zed-diff",
+      "description": "Review every Claude Code edit in a Zed diff: accept, reject, edit, or comment with AI! / AI?"
+    }
+  ]
+}

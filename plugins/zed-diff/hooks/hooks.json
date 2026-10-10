@@ -1,0 +1,17 @@
+{
+  "description": "Open each Edit/Write in a Zed diff and wait for your decision",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/zed_diff.py\"",
+            "timeout": 1800
+          }
+        ]
+      }
+    ]
+  }
+}

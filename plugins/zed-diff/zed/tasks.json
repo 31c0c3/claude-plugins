@@ -1,0 +1,19 @@
+[
+  {
+    // cmd-escape (keymap.json): reject the Claude Code change in the open diff.
+    // Does nothing unless the zed-diff hook is waiting on a diff.
+    "label": "claude: reject diff",
+    "command": "test -e ~/.claude/zed-diff/decision && echo reject > ~/.claude/zed-diff/decision",
+    "reveal": "never",
+    "hide": "always",
+    "allow_concurrent_runs": true
+  },
+  {
+    // cmd-shift-escape: reject, then type the reason in Claude Code's prompt.
+    "label": "claude: reject diff with reason",
+    "command": "test -e ~/.claude/zed-diff/decision && echo ask > ~/.claude/zed-diff/decision",
+    "reveal": "never",
+    "hide": "always",
+    "allow_concurrent_runs": true
+  }
+]

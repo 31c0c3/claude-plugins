@@ -18,9 +18,11 @@ import time
 DECISION = os.path.expanduser("~/.claude/zed-diff/decision")
 SKIP_MODES = ("acceptEdits", "bypassPermissions")  # edits are auto-approved anyway
 
-# a comment that starts or ends with AI, AI! or AI? (Aider's convention)
+# a comment that starts or ends with AI, AI! or AI? (Aider's convention); an HTML or
+# Markdown one whole, its `<!--` before `--` and its `-->` dropped
 AI_COMMENT = re.compile(
-    r"\s*(?:#|//|--|;+)\s*((?<!\w)AI[!?]?(?!\w).*|.*(?<!\w)AI[!?]?)\s*$", re.IGNORECASE
+    r"\s*(?:<!--|#|//|--|;+)\s*((?<!\w)AI[!?]?(?!\w).*?|.*?(?<!\w)AI[!?]?)\s*(?:-->)?\s*$",
+    re.IGNORECASE,
 )
 # or, for files without line comments (Markdown, text): a whole line starting or ending with AI! / AI?
 AI_LINE = re.compile(r"^\s*((?<!\w)AI[!?](?!\w).*|.*(?<!\w)AI[!?])\s*$", re.IGNORECASE)

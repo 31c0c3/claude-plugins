@@ -86,6 +86,9 @@ def review_in_zed(path, orig, new):
     prev_app = front_app()  # e.g. your terminal, to return to after the diff
     try:
         zed = subprocess.run(["zed", "--wait", "--diff", a, b], check=False)
+        # switch back right away, without waiting: Zed stays in front until then
+        if prev_app:
+            subprocess.Popen(["open", "-b", prev_app])
         if zed.returncode != 0:
             return None
         # the reject task may land just after the tab closes, so give it a moment
@@ -102,8 +105,6 @@ def review_in_zed(path, orig, new):
         if os.path.exists(DECISION):
             os.remove(DECISION)
         shutil.rmtree(tmp, ignore_errors=True)
-        if prev_app:
-            subprocess.run(["open", "-b", prev_app], check=False)
 
 
 def decide(tool_name, tool_input, orig, new, edited, decision=""):

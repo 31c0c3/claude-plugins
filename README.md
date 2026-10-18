@@ -8,6 +8,9 @@ Review every Claude Code edit in a [Zed](https://zed.dev) diff before it's appli
 left is the current file, right is Claude's proposal, and the right side is editable.
 Your terminal comes back to the front when you close the diff.
 
+The diff waits until you're looking at the session: its terminal app in front and, in
+[Herdr](https://herdr.dev), its tab focused. After 20 minutes away, Claude Code asks in its prompt instead.
+
 ### Install
 
 ```bash

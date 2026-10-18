@@ -17,6 +17,9 @@ import time
 # file exists, so they do nothing outside a diff opened by this hook.
 DECISION = os.path.expanduser("~/.claude/zed-diff/decision")
 SKIP_MODES = ("acceptEdits", "bypassPermissions")  # edits are auto-approved anyway
+# how long to wait for you to come back to this session before asking in its prompt instead;
+# under the hook's 1800 s timeout, to leave time for the review
+FOCUS_WAIT = 1200
 
 # a comment that starts or ends with AI, AI! or AI? (Aider's convention); an HTML or
 # Markdown one whole, its `<!--` before `--` and its `-->` dropped
@@ -66,6 +69,33 @@ def front_app():
     asn = run("lsappinfo", "front").strip()
     info = run("lsappinfo", "info", "-only", "bundleid", asn)
     return info.rpartition("=")[2].strip().strip('"') or None
+
+
+def session_in_front():
+    """Whether you're looking at this session: its terminal in front and, in Herdr, its tab."""
+    terminal = os.environ.get("__CFBundleIdentifier")  # the app Claude Code runs in
+    if terminal and front_app() != terminal:
+        return False
+    tab = os.environ.get("HERDR_TAB_ID")
+    if not tab:
+        return True
+    try:
+        out = subprocess.run(
+            ["herdr", "tab", "get", tab], check=True, capture_output=True, text=True
+        ).stdout
+        return json.loads(out)["result"]["tab"]["focused"]
+    except (OSError, subprocess.CalledProcessError, ValueError, KeyError):
+        return True  # can't tell: don't hold the edit back
+
+
+def wait_for_session():
+    """Wait until you're looking at this session, so Zed doesn't pop up over other work."""
+    deadline = time.monotonic() + FOCUS_WAIT
+    while not session_in_front():
+        if time.monotonic() > deadline:
+            return False
+        time.sleep(0.5)
+    return True
 
 
 def review_in_zed(path, orig, new):
@@ -187,6 +217,14 @@ def main():
     if new == orig:
         return  # nothing to review, e.g. old_string not found; the tool reports it
 
+    if not wait_for_session():
+        out = {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "ask",
+            "permissionDecisionReason": "You were away, so no Zed diff: review this change here",
+        }
+        print(json.dumps({"hookSpecificOutput": out}))
+        return
     review = review_in_zed(path, orig, new)
     if review is None:
         out = {

@@ -10,7 +10,7 @@ It shows only the changed hunks, with a few lines of context, not the whole file
 Your terminal comes back to the front when you close the diff.
 
 The diff waits until you're looking at the session: its terminal app in front and, in
-[Herdr](https://herdr.dev), its tab focused. After 20 minutes away, Claude Code asks in its prompt instead.
+[Herdr](https://herdr.dev), its pane focused (and, in Ghostty, Herdr's tab selected). After 20 minutes away, Claude Code asks in its prompt instead.
 
 ### Install
 

@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -105,20 +106,34 @@ def front_app():
 
 
 def session_in_front():
-    """Whether you're looking at this session: its terminal in front and, in Herdr, its tab."""
+    """Whether you're looking at this session: its terminal in front and, in Herdr, its pane."""
     terminal = os.environ.get("__CFBundleIdentifier")  # the app Claude Code runs in
     if terminal and front_app() != terminal:
         return False
-    tab = os.environ.get("HERDR_TAB_ID")
-    if not tab:
+    pane = os.environ.get("HERDR_PANE_ID")
+    if not pane:
         return True
     try:
+        # focused is global: one pane in all of Herdr, so it implies its tab and workspace
         out = subprocess.run(
-            ["herdr", "tab", "get", tab], check=True, capture_output=True, text=True
+            ["herdr", "pane", "get", pane], check=True, capture_output=True, text=True
         ).stdout
-        return json.loads(out)["result"]["tab"]["focused"]
+        if not json.loads(out)["result"]["pane"]["focused"]:
+            return False
     except (OSError, subprocess.CalledProcessError, ValueError, KeyError):
         return True  # can't tell: don't hold the edit back
+    # Herdr can't tell when you switch Ghostty tabs, but the window title follows the
+    # selected tab, and Herdr's is `<host>: <workspace>`
+    if terminal == "com.mitchellh.ghostty":
+        title = subprocess.run(
+            ["osascript", "-e", 'tell application "Ghostty" to name of front window'],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if title.returncode == 0:  # else can't tell: don't hold the edit back
+            return title.stdout.startswith(socket.gethostname() + ": ")
+    return True
 
 
 def wait_for_session():

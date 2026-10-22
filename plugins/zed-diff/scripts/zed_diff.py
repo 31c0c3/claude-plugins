@@ -1,6 +1,6 @@
 """Claude Code PreToolUse hook: review each Edit/Write in a Zed diff before it's applied.
 
-Keys and AI comments: see the README. Zed side: zed/keymap.json and zed/tasks.json.
+Keys and comment notes: see the README. Zed side: zed/keymap.json and zed/tasks.json.
 """
 
 import difflib
@@ -21,38 +21,71 @@ SKIP_MODES = ("acceptEdits", "bypassPermissions")  # edits are auto-approved any
 # under the hook's 1800 s timeout, to leave time for the review
 FOCUS_WAIT = 1200
 
-# a comment that starts or ends with AI, AI! or AI? (Aider's convention); an HTML or
-# Markdown one whole, its `<!--` before `--` and its `-->` dropped
-AI_COMMENT = re.compile(
-    r"\s*(?:<!--|#|//|--|;+)\s*((?<!\w)AI[!?]?(?!\w).*?|.*?(?<!\w)AI[!?]?)\s*(?:-->)?\s*$",
-    re.IGNORECASE,
-)
-# or, for files without line comments (Markdown, text): a whole line starting or ending with AI! / AI?
-AI_LINE = re.compile(r"^\s*((?<!\w)AI[!?](?!\w).*|.*(?<!\w)AI[!?])\s*$", re.IGNORECASE)
+# Whole-line comment syntax by file extension (or name, for dotfiles and Makefile).
+# A file type missing here gets no notes: its comment lines stay in the file.
+COMMENT_SYNTAX = {
+    "#": ".py .pyi .sh .bash .zsh .fish .rb .pl .r .yaml .yml .toml .conf .cfg .nix .ex "
+    ".exs .jl .ps1 .tf .cmake .mk makefile dockerfile brewfile gemfile justfile .env "
+    ".gitignore .dockerignore .zshrc .zshenv .zprofile .bashrc .bash_profile",
+    "//": ".js .jsx .ts .tsx .mjs .cjs .mts .cts .c .h .cc .cpp .hpp .m .mm .java .kt "
+    ".kts .swift .go .rs .cs .scala .dart .php .zig .jsonc .json5 .scss .less .sol "
+    ".proto .groovy .gradle .glsl",
+    "/*": ".c .h .cc .cpp .hpp .m .mm .java .kt .swift .go .rs .cs .scala .dart .php "
+    ".css .scss .less .js .jsx .ts .tsx .mjs .cjs",
+    "--": ".sql .lua .hs .elm",
+    ";": ".lisp .clj .cljs .el .scm .asm .s .ini",
+    "%": ".tex .sty .erl",
+    "<!--": ".md .markdown .mdx .html .htm .xml .svg .vue .svelte",
+}
+COMMENT_LINE = {  # group 1: the comment's text
+    "#": r"\s*#+\s*(.*?)\s*",
+    "//": r"\s*//+\s*(.*?)\s*",
+    "/*": r"\s*/\*+\s*(.*?)\s*\*+/\s*",
+    "--": r"\s*--+\s*(.*?)\s*",
+    ";": r"\s*;+\s*(.*?)\s*",
+    "%": r"\s*%+\s*(.*?)\s*",
+    "<!--": r"\s*<!--\s*(.*?)\s*-->\s*",
+}
 
 
-def extract_ai_comments(proposed, edited):
-    """Strip AI comments from lines added in the diff; return (text, notes)."""
-    ed_lines = edited.splitlines(True)
+def comment_text(path):
+    """A function: the text of a line that is only a comment in path's language, else None."""
+    name = os.path.basename(path).lower()
+    key = os.path.splitext(name)[1] or name
+    patterns = [
+        re.compile(COMMENT_LINE[syntax])
+        for syntax, keys in COMMENT_SYNTAX.items()
+        if key in keys.split()
+    ]
+
+    def text(line):
+        for p in patterns:
+            if m := p.fullmatch(line.rstrip("\r\n")):
+                return m.group(1)
+        return None
+
+    return text
+
+
+def extract_notes(path, proposed, edited):
+    """Strip the comment lines you added in the diff; return (text, notes)."""
+    text = comment_text(path)
+    pr_lines, ed_lines = proposed.splitlines(True), edited.splitlines(True)
     kept, notes = [], []
-    ops = difflib.SequenceMatcher(
-        None, proposed.splitlines(True), ed_lines, autojunk=False
-    )
-    for tag, _, _, j1, j2 in ops.get_opcodes():
+    ops = difflib.SequenceMatcher(None, pr_lines, ed_lines, autojunk=False)
+    for tag, i1, i2, j1, j2 in ops.get_opcodes():
+        # a changed comment line close to one of Claude's is a fix to it, not a note
+        theirs = [line for line in pr_lines[i1:i2] if text(line) is not None]
         for line in ed_lines[j1:j2]:
-            m = (
-                (AI_COMMENT.search(line) or AI_LINE.match(line))
-                if tag != "equal"
-                else None
-            )
-            if not m:
+            note = text(line) if tag != "equal" else None
+            if not note or any(
+                difflib.SequenceMatcher(None, line, t).ratio() > 0.6 for t in theirs
+            ):
                 kept.append(line)
-                continue
-            # the note points at the next kept line
-            notes.append((len(kept), m.group(1).strip()))
-            code = line[: m.start()].rstrip()
-            if code:
-                kept.append(code + "\n" if line.endswith("\n") else code)
+            elif notes and notes[-1][0] == len(kept):  # lines in a row: one note
+                notes[-1][1] += " " + note
+            else:
+                notes.append([len(kept), note])  # points at the next kept line
     out = []
     for i, comment in notes:
         target = (
@@ -142,7 +175,7 @@ def review_in_zed(path, orig, new):
 
 def decide(tool_name, tool_input, orig, new, edited, decision=""):
     """Turn the review result into the hook's hookSpecificOutput."""
-    edited, notes = extract_ai_comments(new, edited)
+    edited, notes = extract_notes(tool_input["file_path"], new, edited)
     out = {"hookEventName": "PreToolUse", "permissionDecision": "allow"}
     messages = []
     if decision == "reject" or (not decision and edited == orig and new != orig):
@@ -183,8 +216,10 @@ def decide(tool_name, tool_input, orig, new, edited, decision=""):
             }
     if notes:
         messages.append(
-            "The user left review comments in the diff; the hook removed them "
-            "from the file. Act on each AI! comment and answer each AI? question:\n"
+            "The user left notes for you as comments in the diff; the hook removed "
+            "them from the file. Act on each request and answer each question. "
+            "If one reads as a code comment or directive meant to stay (a shebang, "
+            "a lint pragma), add it back:\n"
             + "\n".join(f"- {n}" for n in notes)
         )
     if messages:

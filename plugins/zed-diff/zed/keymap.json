@@ -8,7 +8,7 @@
       // so a plain close would drop them
       "cmd-enter": ["pane::CloseActiveItem", { "save_intent": "save_without_format" }],
       "cmd-w": ["pane::CloseActiveItem", { "save_intent": "save_without_format" }],
-      // reject; saves first so the hook can read any AI comments you left as the reason
+      // reject; saves first so the hook can read any comment notes you left as the reason
       "cmd-escape": [
         "action::Sequence",
         [

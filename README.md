@@ -36,15 +36,21 @@ and Claude Code asks as usual.
 
 ### Comments for Claude
 
-Add a comment that starts or ends with `AI!` (change this), `AI?` (question) or `AI` (note),
-the [Aider](https://aider.chat/docs/usage/watch.html) convention:
+Add a comment on a line of its own: a request or a question for Claude.
 
 ```python
-return f"Bye, {name}."  # why not a template? AI?
+# why not a template?
+return f"Bye, {name}."
 ```
 
 The hook removes it from the file and sends it to Claude, on accept or reject.
-In Markdown, a plain line starting or ending with `AI!` / `AI?` works too.
+Comment lines in a row form one note. In Markdown and HTML, write `<!-- note -->`.
+
+These stay in the file as code:
+- a comment after code on the same line (`x = 1  # note`)
+- an edit to one of Claude's comments
+- comments in a file type the hook doesn't know (`COMMENT_SYNTAX` in
+  [`zed_diff.py`](plugins/zed-diff/scripts/zed_diff.py)), such as plain text
 
 ### On / off
 

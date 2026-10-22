@@ -1,7 +1,7 @@
 {
   "name": "zed-diff",
-  "version": "0.3.0",
-  "description": "Review every Claude Code edit in a Zed diff: accept, reject, edit, or comment with AI! / AI?",
+  "version": "0.4.0",
+  "description": "Review every Claude Code edit in a Zed diff: accept, reject, edit, or leave comments for Claude",
   "author": {
     "name": "31c0c3",
     "url": "https://github.com/31c0c3"

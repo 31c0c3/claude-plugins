@@ -115,7 +115,10 @@ def review_in_zed(path, orig, new):
 
     prev_app = front_app()  # e.g. your terminal, to return to after the diff
     try:
-        zed = subprocess.run(["zed", "--wait", "--diff", a, b], check=False)
+        # directories, not files: Zed then opens its multi-diff view, which shows only
+        # the changed hunks instead of the whole file
+        dirs = (os.path.dirname(a), os.path.dirname(b))
+        zed = subprocess.run(["zed", "--wait", "--diff", *dirs], check=False)
         # switch back right away, without waiting: Zed stays in front until then
         if prev_app:
             subprocess.Popen(["open", "-b", prev_app])

@@ -6,6 +6,7 @@
 
 Review every Claude Code edit in a [Zed](https://zed.dev) diff before it's applied:
 left is the current file, right is Claude's proposal, and the right side is editable.
+It shows only the changed hunks, with a few lines of context, not the whole file.
 Your terminal comes back to the front when you close the diff.
 
 The diff waits until you're looking at the session: its terminal app in front and, in

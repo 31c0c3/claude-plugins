@@ -107,7 +107,9 @@ def front_app():
 
     asn = run("lsappinfo", "front").strip()
     info = run("lsappinfo", "info", "-only", "bundleid", asn)
-    return info.rpartition("=")[2].strip().strip('"') or None
+    # macOS 27 ignores -only and prints the whole block (ending in Arch=!!none)
+    m = re.search(r'(?:"CFBundleIdentifier"|bundleID)="([^"]+)"', info)
+    return m.group(1) if m else None
 
 
 def herdr(*args):

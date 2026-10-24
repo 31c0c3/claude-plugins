@@ -8,7 +8,6 @@ import json
 import os
 import re
 import shutil
-import socket
 import subprocess
 import sys
 import tempfile
@@ -21,6 +20,7 @@ SKIP_MODES = ("acceptEdits", "bypassPermissions")  # edits are auto-approved any
 # how long to wait for you to come back to this session before asking in its prompt instead;
 # under the hook's 1800 s timeout, to leave time for the review
 FOCUS_WAIT = 1200
+CMD_TIMEOUT = 2  # s, for each lsappinfo, herdr and osascript call: a stuck one can't hold edits
 
 # Whole-line comment syntax by file extension (or name, for dotfiles and Makefile).
 # A file type missing here gets no notes: its comment lines stay in the file.
@@ -98,41 +98,59 @@ def extract_notes(path, proposed, edited):
 
 def front_app():
     def run(*args):
-        return subprocess.run(args, check=False, capture_output=True, text=True).stdout
+        try:
+            return subprocess.run(
+                args, check=False, capture_output=True, text=True, timeout=CMD_TIMEOUT
+            ).stdout
+        except subprocess.TimeoutExpired:
+            return ""
 
     asn = run("lsappinfo", "front").strip()
     info = run("lsappinfo", "info", "-only", "bundleid", asn)
     return info.rpartition("=")[2].strip().strip('"') or None
 
 
+def herdr(*args):
+    """Run a herdr CLI command; return its JSON result."""
+    out = subprocess.run(
+        ["herdr", *args], check=True, capture_output=True, text=True, timeout=CMD_TIMEOUT
+    ).stdout
+    return json.loads(out)["result"]
+
+
 def session_in_front():
     """Whether you're looking at this session: its terminal in front and, in Herdr, its pane."""
     terminal = os.environ.get("__CFBundleIdentifier")  # the app Claude Code runs in
-    if terminal and front_app() != terminal:
+    front = front_app()
+    if terminal and front and front != terminal:  # no front app: can't tell
         return False
     pane = os.environ.get("HERDR_PANE_ID")
     if not pane:
         return True
     try:
         # focused is global: one pane in all of Herdr, so it implies its tab and workspace
-        out = subprocess.run(
-            ["herdr", "pane", "get", pane], check=True, capture_output=True, text=True
-        ).stdout
-        if not json.loads(out)["result"]["pane"]["focused"]:
+        info = herdr("pane", "get", pane)["pane"]
+        if not info["focused"]:
             return False
-    except (OSError, subprocess.CalledProcessError, ValueError, KeyError):
+        workspace = herdr("workspace", "get", info["workspace_id"])["workspace"]["label"]
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError):
         return True  # can't tell: don't hold the edit back
     # Herdr can't tell when you switch Ghostty tabs, but the window title follows the
-    # selected tab, and Herdr's is `<host>: <workspace>`
+    # selected tab, and Herdr's is `<host>: <workspace>`. Match the workspace, not the
+    # host: that's the network hostname, which changes with the network (.home, .local)
     if terminal == "com.mitchellh.ghostty":
-        title = subprocess.run(
-            ["osascript", "-e", 'tell application "Ghostty" to name of front window'],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            title = subprocess.run(
+                ["osascript", "-e", 'tell application "Ghostty" to name of front window'],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=CMD_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            return True
         if title.returncode == 0:  # else can't tell: don't hold the edit back
-            return title.stdout.startswith(socket.gethostname() + ": ")
+            return title.stdout.strip().endswith(": " + workspace)
     return True
 
 

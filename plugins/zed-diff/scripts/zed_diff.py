@@ -20,7 +20,7 @@ SKIP_MODES = ("acceptEdits", "bypassPermissions")  # edits are auto-approved any
 # how long to wait for you to come back to this session before asking in its prompt instead;
 # under the hook's 1800 s timeout, to leave time for the review
 FOCUS_WAIT = 1200
-CMD_TIMEOUT = 2  # s, for each lsappinfo, herdr and osascript call: a stuck one can't hold edits
+CMD_TIMEOUT = 2  # s, for each lsappinfo and herdr call: a stuck one can't hold edits
 
 # Whole-line comment syntax by file extension (or name, for dotfiles and Makefile).
 # A file type missing here gets no notes: its comment lines stay in the file.
@@ -130,30 +130,12 @@ def session_in_front():
     if not pane:
         return True
     try:
-        # focused is global: one pane in all of Herdr, so it implies its tab and workspace
-        info = herdr("pane", "get", pane)["pane"]
-        if not info["focused"]:
-            return False
-        workspace = herdr("workspace", "get", info["workspace_id"])["workspace"]["label"]
+        # focused is global: one pane in all of Herdr, so it implies its tab and workspace.
+        # It can't tell when you switch Ghostty tabs; the window title could, but it goes
+        # stale (it kept a renamed workspace's old name), so that goes unchecked
+        return herdr("pane", "get", pane)["pane"]["focused"]
     except (OSError, subprocess.SubprocessError, ValueError, KeyError):
         return True  # can't tell: don't hold the edit back
-    # Herdr can't tell when you switch Ghostty tabs, but the window title follows the
-    # selected tab, and Herdr's is `<host>: <workspace>`. Match the workspace, not the
-    # host: that's the network hostname, which changes with the network (.home, .local)
-    if terminal == "com.mitchellh.ghostty":
-        try:
-            title = subprocess.run(
-                ["osascript", "-e", 'tell application "Ghostty" to name of front window'],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=CMD_TIMEOUT,
-            )
-        except subprocess.TimeoutExpired:
-            return True
-        if title.returncode == 0:  # else can't tell: don't hold the edit back
-            return title.stdout.strip().endswith(": " + workspace)
-    return True
 
 
 def wait_for_session():
